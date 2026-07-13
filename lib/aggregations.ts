@@ -46,66 +46,54 @@ export function computeKpis(rows: FillRateRow[]): Kpis {
   };
 }
 
-export interface TrendPoint {
-  semana: string;
-  fillRatePromedio: number;
-}
-
-/** Tendencia de Fill Rate por semana, ordenada (asume formato tipo "W27" o similar, orden alfabético) */
-export function computeTrend(rows: FillRateRow[]): TrendPoint[] {
-  const bySemana = new Map<string, { sum: number; count: number }>();
-  for (const r of rows) {
-    const cur = bySemana.get(r.semana) ?? { sum: 0, count: 0 };
-    cur.sum += r.fillRate;
-    cur.count += 1;
-    bySemana.set(r.semana, cur);
-  }
-  return Array.from(bySemana.entries())
-    .map(([semana, { sum, count }]) => ({ semana, fillRatePromedio: Number((sum / count).toFixed(2)) }))
-    .sort((a, b) => a.semana.localeCompare(b.semana, "es", { numeric: true }));
-}
-
-export interface SubcategoriaPoint {
-  subcategoria: string;
+export interface CategoriaPoint {
+  categoria: string;
   entrega: number;
 }
 
-/** Entregado por subcategoría, top N + agrupación de "Otras" */
-export function computeEntregaPorSubcategoria(rows: FillRateRow[], topN = 8): SubcategoriaPoint[] {
+/** Entregado por categoría, top N + agrupación de "Otras" */
+export function computeEntregaPorCategoria(rows: FillRateRow[], topN = 8): CategoriaPoint[] {
   const map = new Map<string, number>();
   for (const r of rows) {
-    map.set(r.subcategoria, (map.get(r.subcategoria) ?? 0) + r.entrega);
+    map.set(r.categoria, (map.get(r.categoria) ?? 0) + r.entrega);
   }
   const sorted = Array.from(map.entries())
-    .map(([subcategoria, entrega]) => ({ subcategoria, entrega }))
+    .map(([categoria, entrega]) => ({ categoria, entrega }))
     .sort((a, b) => b.entrega - a.entrega);
 
   if (sorted.length <= topN) return sorted;
 
   const top = sorted.slice(0, topN);
   const otras = sorted.slice(topN).reduce((acc, cur) => acc + cur.entrega, 0);
-  return [...top, { subcategoria: "Otras", entrega: otras }];
+  return [...top, { categoria: "Otras", entrega: otras }];
 }
 
-export interface TiendaPoint {
+export interface TiendaEntregaPoint {
   tienda: string;
+  entrega: number;
   fillRatePromedio: number;
 }
 
-/** Top N tiendas por Fill Rate promedio (requiere volumen mínimo para evitar outliers de 1 registro) */
-export function computeTopTiendas(rows: FillRateRow[], topN = 10, minRegistros = 1): TiendaPoint[] {
-  const map = new Map<string, { sum: number; count: number }>();
+/**
+ * Top/bottom N tiendas por unidades entregadas.
+ * order "desc" = las que más recibieron entrega; "asc" = las que menos.
+ */
+export function computeTiendasPorEntrega(rows: FillRateRow[], topN = 10, order: "desc" | "asc" = "desc"): TiendaEntregaPoint[] {
+  const map = new Map<string, { entrega: number; fillRateSum: number; count: number }>();
   for (const r of rows) {
-    const cur = map.get(r.tienda) ?? { sum: 0, count: 0 };
-    cur.sum += r.fillRate;
+    const cur = map.get(r.tienda) ?? { entrega: 0, fillRateSum: 0, count: 0 };
+    cur.entrega += r.entrega;
+    cur.fillRateSum += r.fillRate;
     cur.count += 1;
     map.set(r.tienda, cur);
   }
-  return Array.from(map.entries())
-    .filter(([, v]) => v.count >= minRegistros)
-    .map(([tienda, { sum, count }]) => ({ tienda, fillRatePromedio: Number((sum / count).toFixed(2)) }))
-    .sort((a, b) => b.fillRatePromedio - a.fillRatePromedio)
-    .slice(0, topN);
+  const list = Array.from(map.entries()).map(([tienda, v]) => ({
+    tienda,
+    entrega: v.entrega,
+    fillRatePromedio: Number((v.fillRateSum / v.count).toFixed(2)),
+  }));
+  list.sort((a, b) => (order === "desc" ? b.entrega - a.entrega : a.entrega - b.entrega));
+  return list.slice(0, topN);
 }
 
 export interface ClasificacionCount {
@@ -128,40 +116,6 @@ export function computeDistribucionClasificacion(rows: FillRateRow[]): Clasifica
     registros: map.get(clasificacion) ?? 0,
     porcentaje: Number((((map.get(clasificacion) ?? 0) / total) * 100).toFixed(1)),
   }));
-}
-
-export interface HeatmapCell {
-  semana: string;
-  clasificacion: string;
-  porcentaje: number; // % de registros de esa semana que caen en esa clasificación
-  registros: number;
-}
-
-/** Matriz semana x clasificación para el mapa de calor */
-export function computeHeatmap(rows: FillRateRow[]): { semanas: string[]; cells: HeatmapCell[] } {
-  const bySemana = new Map<string, Map<string, number>>();
-  const totalPorSemana = new Map<string, number>();
-
-  for (const r of rows) {
-    if (!bySemana.has(r.semana)) bySemana.set(r.semana, new Map());
-    const inner = bySemana.get(r.semana)!;
-    inner.set(r.clasificacion, (inner.get(r.clasificacion) ?? 0) + 1);
-    totalPorSemana.set(r.semana, (totalPorSemana.get(r.semana) ?? 0) + 1);
-  }
-
-  const semanas = Array.from(bySemana.keys()).sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
-  const cells: HeatmapCell[] = [];
-
-  for (const semana of semanas) {
-    const inner = bySemana.get(semana)!;
-    const total = totalPorSemana.get(semana) ?? 1;
-    for (const clasificacion of CLASIFICACIONES) {
-      const registros = inner.get(clasificacion) ?? 0;
-      cells.push({ semana, clasificacion, registros, porcentaje: Number(((registros / total) * 100).toFixed(1)) });
-    }
-  }
-
-  return { semanas, cells };
 }
 
 /** Extrae los valores únicos de un campo, para poblar los <select> de filtros */

@@ -11,6 +11,7 @@ import { useFillRateData } from "@/context/DataContext";
 import { exportToExcel, exportToPdf } from "@/lib/exportUtils";
 import { getClasificacionColor } from "@/lib/colors";
 import { formatPercent, formatNumber } from "@/lib/format";
+import { computeKpis } from "@/lib/aggregations";
 import ChartCard from "./ChartCard";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -20,6 +21,12 @@ export default function DataTable() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
+
+  const kpis = computeKpis(filteredRows);
+  const insight =
+    filteredRows.length > 0
+      ? `${formatNumber(filteredRows.length)} registros de ${formatNumber(kpis.tiendas)} tiendas, con un cumplimiento (Entregado/Surtido) de ${formatPercent(kpis.cumplimiento)}.`
+      : undefined;
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -69,7 +76,7 @@ export default function DataTable() {
   );
 
   return (
-    <ChartCard title="Detalle" subtitle={`${formatNumber(filteredRows.length)} registros con el filtro actual`} actions={actions}>
+    <ChartCard title="Detalle" subtitle={`${formatNumber(filteredRows.length)} registros con el filtro actual`} actions={actions} insight={insight}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>

@@ -102,50 +102,85 @@ function parseBaseMaestra(workbook: XLSX.WorkBook, fileName: string): ParseResul
   const errors: ParseIssue[] = [];
   const warnings: ParseIssue[] = [];
 
+  // Excel suele combinar (merge) celdas de Semana/País/Departamento/Categoría/
+  // Subcategoría/Clasificación cuando se repiten para varias tiendas seguidas.
+  // SheetJS solo devuelve el valor en la primera celda del grupo combinado y
+  // deja el resto en blanco — sin esto, esas filas se perderían o quedarían
+  // incompletas aunque los datos numéricos (Surtido/Entregado) sí existan.
+  const lastValues: Record<"semana" | "pais" | "departamento" | "categoria" | "subcategoria" | "clasificacion", string> = {
+    semana: "",
+    pais: "",
+    departamento: "",
+    categoria: "",
+    subcategoria: "",
+    clasificacion: "",
+  };
+
   for (let i = 1; i < matrix.length; i++) {
     const excelRowNumber = i + 1;
     const raw = matrix[i];
     const get = (field: keyof FillRateRow) => raw[columnIndex[field]!];
 
-    const semana = String(get("semana") ?? "").trim();
-    const pais = String(get("pais") ?? "").trim();
+    const rawSemana = String(get("semana") ?? "").trim();
+    const rawPais = String(get("pais") ?? "").trim();
     const tienda = String(get("tienda") ?? "").trim();
-    const departamento = String(get("departamento") ?? "").trim();
-    const categoria = String(get("categoria") ?? "").trim();
-    const subcategoria = String(get("subcategoria") ?? "").trim();
+    const rawDepartamento = String(get("departamento") ?? "").trim();
+    const rawCategoria = String(get("categoria") ?? "").trim();
+    const rawSubcategoria = String(get("subcategoria") ?? "").trim();
+    const rawClasificacion = String(get("clasificacion") ?? "").trim();
 
-    if (!semana && !tienda && !pais && !departamento) continue;
+    const surtidoRaw = toNumber(get("surtido"));
+    const entregaRaw = toNumber(get("entrega"));
 
+    // Fila totalmente vacía (ni texto ni números en ninguna columna clave) -> se ignora en silencio.
+    // Se evalúa ANTES del forward-fill, con los valores crudos, para no confundir
+    // una fila realmente vacía con una fila válida que solo "heredó" texto.
+    if (!rawSemana && !tienda && !rawPais && !rawDepartamento && surtidoRaw === null && entregaRaw === null) continue;
+
+    const semana = rawSemana || lastValues.semana;
+    const pais = rawPais || lastValues.pais;
+    const departamento = rawDepartamento || lastValues.departamento;
+    const categoria = rawCategoria || lastValues.categoria;
+    const subcategoria = rawSubcategoria || lastValues.subcategoria;
+    const clasificacionRaw = rawClasificacion || lastValues.clasificacion;
+
+    lastValues.semana = semana;
+    lastValues.pais = pais;
+    lastValues.departamento = departamento;
+    lastValues.categoria = categoria;
+    lastValues.subcategoria = subcategoria;
+    lastValues.clasificacion = clasificacionRaw;
+
+    // A partir de aquí la fila SIEMPRE se incluye — solo se avisa qué faltaba,
+    // para no perder datos reales por un campo suelto vacío o mal escrito.
     const missingText: string[] = [];
     if (!semana) missingText.push("Semana");
     if (!pais) missingText.push("País");
     if (!tienda) missingText.push("Tienda");
     if (!departamento) missingText.push("Departamento");
 
-    const surtido = toNumber(get("surtido"));
-    const entrega = toNumber(get("entrega"));
-    let fillRate = readPercentCell(sheet, i, columnIndex.fillRate!);
-
-    if (surtido === null) missingText.push("Surtido (no numérico)");
-    if (entrega === null) missingText.push("Entregado (no numérico)");
+    const surtido = surtidoRaw ?? 0;
+    const entrega = entregaRaw ?? 0;
+    if (surtidoRaw === null) missingText.push("Surtido (se usó 0)");
+    if (entregaRaw === null) missingText.push("Entregado (se usó 0)");
 
     if (missingText.length > 0) {
-      errors.push({ row: excelRowNumber, message: `Fila descartada: ${missingText.join(", ")}.` });
-      continue;
+      warnings.push({ row: excelRowNumber, message: `Datos incompletos: ${missingText.join(", ")}.` });
     }
 
-    if (fillRate === null && surtido! > 0) {
-      fillRate = Number(((entrega! / surtido!) * 100).toFixed(2));
+    let fillRate = readPercentCell(sheet, i, columnIndex.fillRate!);
+
+    if (fillRate === null && surtido > 0) {
+      fillRate = Number(((entrega / surtido) * 100).toFixed(2));
       warnings.push({ row: excelRowNumber, message: "Fill Rate calculado automáticamente (venía vacío)." });
     } else if (fillRate === null) {
       fillRate = 0;
-      warnings.push({ row: excelRowNumber, message: "Fill Rate no se pudo calcular (Surtido = 0)." });
     } else {
       fillRate = Number(fillRate.toFixed(2));
     }
 
-    const { value: clasificacion, matched } = normalizeClasificacion(get("clasificacion"));
-    if (!matched) {
+    const { value: clasificacion, matched } = normalizeClasificacion(clasificacionRaw);
+    if (!matched && clasificacion) {
       warnings.push({
         row: excelRowNumber,
         message: `Clasificación "${clasificacion}" no coincide con los valores esperados (Overfilled, Completa, Básico, Undersized).`,
@@ -159,9 +194,9 @@ function parseBaseMaestra(workbook: XLSX.WorkBook, fileName: string): ParseResul
       departamento,
       categoria,
       subcategoria,
-      surtido: surtido!,
-      entrega: entrega!,
-      fillRate: fillRate!,
+      surtido,
+      entrega,
+      fillRate,
       clasificacion,
     });
   }

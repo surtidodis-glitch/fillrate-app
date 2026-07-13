@@ -7,6 +7,7 @@
 
 import { useFillRateData } from "@/context/DataContext";
 import { formatPercent, formatNumber } from "@/lib/format";
+import { insightMezcla } from "@/lib/insights";
 import ChartCard from "./ChartCard";
 import type { MezclaTable } from "@/lib/types";
 
@@ -26,7 +27,7 @@ export default function MezclaTables() {
 
 function MezclaTableCard({ table }: { table: MezclaTable }) {
   return (
-    <ChartCard title={table.titulo} subtitle="Desde la hoja DATOS_MEZCLA">
+    <ChartCard title={table.titulo} subtitle="Desde la hoja de mezcla" insight={insightMezcla(table)}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>

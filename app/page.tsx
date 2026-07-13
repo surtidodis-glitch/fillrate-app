@@ -7,11 +7,10 @@ import Sidebar from "@/components/Sidebar";
 import FiltersBar from "@/components/FiltersBar";
 import FileUpload from "@/components/FileUpload";
 import KpiCards from "@/components/KpiCards";
-import TrendChart from "@/components/TrendChart";
-import SubcategoryChart from "@/components/SubcategoryChart";
+import TopEntregaChart from "@/components/TopEntregaChart";
+import CategoryChart from "@/components/CategoryChart";
 import TopStoresChart from "@/components/TopStoresChart";
 import ClassificationDistribution from "@/components/ClassificationDistribution";
-import ClassificationHeatmap from "@/components/ClassificationHeatmap";
 import MezclaTables from "@/components/MezclaTables";
 import DataTable from "@/components/DataTable";
 
@@ -71,8 +70,8 @@ export default function Home() {
               <KpiCards />
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <TrendChart />
-                <SubcategoryChart />
+                <TopEntregaChart />
+                <CategoryChart />
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -81,8 +80,6 @@ export default function Home() {
               </div>
 
               <MezclaTables />
-
-              <ClassificationHeatmap />
 
               <DataTable />
             </>

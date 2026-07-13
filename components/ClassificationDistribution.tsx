@@ -7,6 +7,7 @@ import { useFillRateData } from "@/context/DataContext";
 import { computeDistribucionClasificacion } from "@/lib/aggregations";
 import { getClasificacionColor } from "@/lib/colors";
 import { formatPercent, formatNumber } from "@/lib/format";
+import { insightClasificacion } from "@/lib/insights";
 import ChartCard from "./ChartCard";
 
 export default function ClassificationDistribution() {
@@ -14,7 +15,7 @@ export default function ClassificationDistribution() {
   const data = computeDistribucionClasificacion(filteredRows);
 
   return (
-    <ChartCard title="Distribución por Clasificación" subtitle="% de registros en el periodo filtrado">
+    <ChartCard title="Distribución por Clasificación" subtitle="% de registros en el periodo filtrado" insight={insightClasificacion(data)}>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 16 }}>
           <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />

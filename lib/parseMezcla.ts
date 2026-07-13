@@ -14,7 +14,23 @@ import { normalizeHeader, toNumber, readPercentCell, readCellText } from "./exce
 const SHEET_NAME = "DATOS_MEZCLA";
 
 function normalizeSheetName(name: string): string {
-  return name.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s_-]+/g, "");
+}
+
+/**
+ * Busca la hoja de mezcla de forma flexible: coincidencia exacta con
+ * "DATOS_MEZCLA" primero, y si no aparece, cualquier hoja cuyo nombre
+ * contenga "mezcla" (cubre variantes como "Datos Mezcla", "Mezcla 2026", etc.).
+ */
+function findMezclaSheetName(workbook: XLSX.WorkBook): string | undefined {
+  const exact = workbook.SheetNames.find((n) => normalizeSheetName(n) === normalizeSheetName(SHEET_NAME));
+  if (exact) return exact;
+  return workbook.SheetNames.find((n) => normalizeSheetName(n).includes("mezcla"));
 }
 
 function titleCase(s: string): string {
@@ -62,8 +78,8 @@ function parseRow(sheet: XLSX.WorkSheet, matrixRow: unknown[], rowIdx: number, c
 }
 
 export function parseMezclaSheet(workbook: XLSX.WorkBook): MezclaParseResult {
-  const sheetName = workbook.SheetNames.find((n) => normalizeSheetName(n) === normalizeSheetName(SHEET_NAME));
-  if (!sheetName) return { found: false, tables: [] };
+  const sheetName = findMezclaSheetName(workbook);
+  if (!sheetName) return { found: false, tables: [], availableSheets: workbook.SheetNames };
 
   const sheet = workbook.Sheets[sheetName];
   const matrix: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: true, defval: "" });

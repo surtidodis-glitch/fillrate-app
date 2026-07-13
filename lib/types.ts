@@ -78,6 +78,7 @@ export interface MezclaTable {
 export interface MezclaParseResult {
   found: boolean; // true si la hoja DATOS_MEZCLA existe en el archivo
   tables: MezclaTable[];
+  availableSheets?: string[]; // solo si found=false, para depurar el nombre real de la hoja
 }
 
 export const EMPTY_MEZCLA: MezclaParseResult = { found: false, tables: [] };
