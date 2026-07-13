@@ -1,21 +1,24 @@
 "use client";
 
 // context/DataContext.tsx
-// Única fuente de verdad del dashboard: las filas parseadas del Excel
-// y el estado de los filtros. Todo vive en memoria del navegador.
+// Única fuente de verdad del dashboard: las filas parseadas de BASE_MAESTRA,
+// las tablas de DATOS_MEZCLA (opcional) y el estado de los filtros. Todo
+// vive en memoria del navegador.
 
 import { createContext, useContext, useMemo, useState, ReactNode } from "react";
-import type { FillRateRow, FilterState, FilterField, ParseResult } from "@/lib/types";
-import { EMPTY_FILTERS } from "@/lib/types";
+import type { FillRateRow, FilterState, FilterField, ParseResult, MezclaParseResult } from "@/lib/types";
+import { EMPTY_FILTERS, EMPTY_MEZCLA } from "@/lib/types";
 
 interface DataContextValue {
   rows: FillRateRow[];
   filteredRows: FillRateRow[];
   filters: FilterState;
   setFilter: (field: FilterField | "q", value: string) => void;
+  setDepartamentoYCategoria: (departamento: string, categoria: string) => void;
   resetFilters: () => void;
   fileMeta: { fileName: string; totalRowsInSheet: number; warnings: number; errors: number } | null;
-  loadParsedData: (result: ParseResult) => void;
+  mezcla: MezclaParseResult;
+  loadParsedData: (base: ParseResult, mezcla: MezclaParseResult) => void;
   hasData: boolean;
 }
 
@@ -25,20 +28,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<FillRateRow[]>([]);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [fileMeta, setFileMeta] = useState<DataContextValue["fileMeta"]>(null);
+  const [mezcla, setMezcla] = useState<MezclaParseResult>(EMPTY_MEZCLA);
 
-  const loadParsedData = (result: ParseResult) => {
-    setRows(result.rows);
+  const loadParsedData = (base: ParseResult, mezclaResult: MezclaParseResult) => {
+    setRows(base.rows);
     setFilters(EMPTY_FILTERS);
+    setMezcla(mezclaResult);
     setFileMeta({
-      fileName: result.fileName,
-      totalRowsInSheet: result.totalRowsInSheet,
-      warnings: result.warnings.length,
-      errors: result.errors.length,
+      fileName: base.fileName,
+      totalRowsInSheet: base.totalRowsInSheet,
+      warnings: base.warnings.length,
+      errors: base.errors.length,
     });
   };
 
   const setFilter = (field: FilterField | "q", value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Usado por el sidebar: al elegir una categoría dentro de un departamento,
+  // se fijan ambos filtros a la vez (departamento + categoría específica).
+  const setDepartamentoYCategoria = (departamento: string, categoria: string) => {
+    setFilters((prev) => ({ ...prev, departamento, categoria }));
   };
 
   const resetFilters = () => setFilters(EMPTY_FILTERS);
@@ -66,8 +77,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     filteredRows,
     filters,
     setFilter,
+    setDepartamentoYCategoria,
     resetFilters,
     fileMeta,
+    mezcla,
     loadParsedData,
     hasData: rows.length > 0,
   };

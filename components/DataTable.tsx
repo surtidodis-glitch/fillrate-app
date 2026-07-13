@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, FileDown, FileSpreadsheet } from "lucide-rea
 import { useFillRateData } from "@/context/DataContext";
 import { exportToExcel, exportToPdf } from "@/lib/exportUtils";
 import { getClasificacionColor } from "@/lib/colors";
+import { formatPercent, formatNumber } from "@/lib/format";
 import ChartCard from "./ChartCard";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -68,7 +69,7 @@ export default function DataTable() {
   );
 
   return (
-    <ChartCard title="Detalle" subtitle={`${filteredRows.length.toLocaleString("es")} registros con el filtro actual`} actions={actions}>
+    <ChartCard title="Detalle" subtitle={`${formatNumber(filteredRows.length)} registros con el filtro actual`} actions={actions}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
@@ -94,9 +95,9 @@ export default function DataTable() {
                 <Td>{r.departamento}</Td>
                 <Td>{r.categoria}</Td>
                 <Td>{r.subcategoria}</Td>
-                <Td align="right">{r.surtido.toLocaleString("es")}</Td>
-                <Td align="right">{r.entrega.toLocaleString("es")}</Td>
-                <Td align="right">{r.fillRate}%</Td>
+                <Td align="right">{formatNumber(r.surtido)}</Td>
+                <Td align="right">{formatNumber(r.entrega)}</Td>
+                <Td align="right">{formatPercent(r.fillRate)}</Td>
                 <Td>
                   <span
                     className="rounded-full px-2 py-0.5 text-[10px] font-medium"

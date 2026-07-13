@@ -9,6 +9,7 @@ import { useFillRateData } from "@/context/DataContext";
 import { computeHeatmap } from "@/lib/aggregations";
 import { CLASIFICACIONES } from "@/lib/types";
 import { getClasificacionColor } from "@/lib/colors";
+import { formatPercent } from "@/lib/format";
 import ChartCard from "./ChartCard";
 
 export default function ClassificationHeatmap() {
@@ -59,7 +60,7 @@ export default function ClassificationHeatmap() {
                           color: pct > 35 ? "#0a0e17" : "#e5e7eb",
                         }}
                       >
-                        {pct > 0 ? `${pct}%` : ""}
+                        {pct > 0 ? formatPercent(pct) : ""}
                       </div>
                     </td>
                   );

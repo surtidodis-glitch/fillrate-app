@@ -7,8 +7,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
-import { parseFillRateWorkbook } from "@/lib/parseExcel";
-import type { ParseResult } from "@/lib/types";
+import { parseWorkbookFile } from "@/lib/parseExcel";
+import type { ParseResult, MezclaParseResult } from "@/lib/types";
 import { useFillRateData } from "@/context/DataContext";
 
 type Status = "idle" | "dragging" | "parsing" | "success" | "error";
@@ -17,6 +17,7 @@ export default function FileUpload() {
   const { loadParsedData } = useFillRateData();
   const [status, setStatus] = useState<Status>("idle");
   const [lastResult, setLastResult] = useState<ParseResult | null>(null);
+  const [lastMezcla, setLastMezcla] = useState<MezclaParseResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +33,7 @@ export default function FileUpload() {
       setErrorMessage(null);
 
       try {
-        const result = await parseFillRateWorkbook(file);
+        const { base: result, mezcla } = await parseWorkbookFile(file);
 
         if (result.missingColumns.length > 0) {
           setStatus("error");
@@ -49,8 +50,9 @@ export default function FileUpload() {
         }
 
         setLastResult(result);
+        setLastMezcla(mezcla);
         setStatus("success");
-        loadParsedData(result);
+        loadParsedData(result, mezcla);
       } catch (err) {
         setStatus("error");
         setErrorMessage((err as Error).message);
@@ -137,6 +139,13 @@ export default function FileUpload() {
             </p>
             {lastResult.warnings.length > 0 && (
               <p className="mt-1 text-emerald-400/80">{lastResult.warnings.length} advertencia(s) — ver detalle abajo.</p>
+            )}
+            {lastMezcla && (
+              <p className="mt-1 text-emerald-400/70">
+                {lastMezcla.found
+                  ? `Hoja DATOS_MEZCLA detectada: ${lastMezcla.tables.length} tabla(s) de mezcla.`
+                  : "No se encontró la hoja DATOS_MEZCLA (opcional) — se omite esa sección."}
+              </p>
             )}
           </div>
         </div>

@@ -12,6 +12,7 @@ import SubcategoryChart from "@/components/SubcategoryChart";
 import TopStoresChart from "@/components/TopStoresChart";
 import ClassificationDistribution from "@/components/ClassificationDistribution";
 import ClassificationHeatmap from "@/components/ClassificationHeatmap";
+import MezclaTables from "@/components/MezclaTables";
 import DataTable from "@/components/DataTable";
 
 export default function Home() {
@@ -78,6 +79,8 @@ export default function Home() {
                 <TopStoresChart />
                 <ClassificationDistribution />
               </div>
+
+              <MezclaTables />
 
               <ClassificationHeatmap />
 

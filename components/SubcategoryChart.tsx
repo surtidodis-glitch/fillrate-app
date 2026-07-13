@@ -9,6 +9,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { useFillRateData } from "@/context/DataContext";
 import { computeEntregaPorSubcategoria } from "@/lib/aggregations";
 import { SERIES_PALETTE } from "@/lib/colors";
+import { formatNumber } from "@/lib/format";
 import ChartCard from "./ChartCard";
 
 export default function SubcategoryChart() {
@@ -42,7 +43,7 @@ export default function SubcategoryChart() {
             </Pie>
             <Tooltip
               contentStyle={{ background: "#0f1420", border: "1px solid #1f2937", borderRadius: 8, fontSize: 12 }}
-              formatter={(v: number, n: string) => [v.toLocaleString("es"), n]}
+              formatter={(v: number, n: string) => [formatNumber(v), n]}
             />
           </PieChart>
         ) : (
@@ -59,7 +60,7 @@ export default function SubcategoryChart() {
             />
             <Tooltip
               contentStyle={{ background: "#0f1420", border: "1px solid #1f2937", borderRadius: 8, fontSize: 12 }}
-              formatter={(v: number) => [v.toLocaleString("es"), "Entregado"]}
+              formatter={(v: number) => [formatNumber(v), "Entregado"]}
             />
             <Bar dataKey="entrega" radius={[0, 4, 4, 0]}>
               {data.map((_, i) => (

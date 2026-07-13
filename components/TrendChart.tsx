@@ -5,6 +5,7 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useFillRateData } from "@/context/DataContext";
 import { computeTrend } from "@/lib/aggregations";
+import { formatPercent } from "@/lib/format";
 import ChartCard from "./ChartCard";
 
 export default function TrendChart() {
@@ -28,12 +29,12 @@ export default function TrendChart() {
             axisLine={false}
             tickLine={false}
             domain={[0, (max: number) => Math.max(100, Math.ceil((max + 10) / 10) * 10)]}
-            tickFormatter={(v) => `${v}%`}
+            tickFormatter={(v) => formatPercent(v)}
           />
           <Tooltip
             contentStyle={{ background: "#0f1420", border: "1px solid #1f2937", borderRadius: 8, fontSize: 12 }}
             labelStyle={{ color: "#e5e7eb" }}
-            formatter={(v: number) => [`${v}%`, "Fill Rate"]}
+            formatter={(v: number) => [formatPercent(v), "Fill Rate"]}
           />
           <Area type="monotone" dataKey="fillRatePromedio" stroke="#818cf8" strokeWidth={2} fill="url(#fillRateGradient)" />
         </AreaChart>

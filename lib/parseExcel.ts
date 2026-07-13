@@ -1,9 +1,15 @@
 // lib/parseExcel.ts
 // Parseo 100% en el navegador. No hay llamada a ningún backend: el File
 // que suelta el usuario se lee con ArrayBuffer y se procesa con SheetJS.
+//
+// parseWorkbookFile() es el punto de entrada: lee el archivo UNA sola vez
+// y de ahí extrae tanto BASE_MAESTRA (obligatoria) como DATOS_MEZCLA
+// (opcional, hoja aparte con las tablas de mezcla de producto).
 
 import * as XLSX from "xlsx";
-import type { FillRateRow, ParseResult, ParseIssue, Clasificacion } from "./types";
+import type { FillRateRow, ParseResult, ParseIssue, Clasificacion, MezclaParseResult } from "./types";
+import { normalizeHeader, toNumber, readPercentCell } from "./excelUtils";
+import { parseMezclaSheet } from "./parseMezcla";
 
 const REQUIRED_SHEET = "BASE_MAESTRA";
 const IGNORED_SHEET = "SV";
@@ -39,72 +45,13 @@ const DISPLAY_NAMES: Record<keyof FillRateRow, string> = {
   clasificacion: "Clasificación",
 };
 
-function normalizeHeader(raw: string): string {
-  return raw
-    .toString()
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function toNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  const cleaned = String(value).replace(/[%\s]/g, "").replace(",", ".");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
 function normalizeClasificacion(raw: unknown): { value: string; matched: boolean } {
   const s = String(raw ?? "").trim();
   const found = VALID_CLASIFICACIONES.find((c) => c.toLowerCase() === s.toLowerCase());
   return { value: found ?? s, matched: Boolean(found) };
 }
 
-/**
- * Excel guarda los porcentajes como fracción (106.9% se guarda como 1.069) y
- * solo aplica el símbolo "%" como formato visual de la celda. Si leemos el
- * valor crudo sin considerar esto, "106.9%" se convierte en "1.069%" en
- * pantalla — el bug que corrige esta función.
- *
- * Estrategia:
- * 1. Si la celda tiene texto formateado con "%" (ej. "106.90%"), se usa ese
- *    número directamente: ya viene en escala de porcentaje.
- * 2. Si el formato numérico de la celda (z) es de tipo porcentaje, el valor
- *    crudo es una fracción → se multiplica por 100.
- * 3. Si no hay info de formato pero el número es muy pequeño (<= 5), es casi
- *    seguro una fracción escrita a mano (ej. 0.95) → se multiplica por 100.
- * 4. En cualquier otro caso, el número ya está en escala de porcentaje.
- */
-function readFillRatePercent(sheet: XLSX.WorkSheet, row: number, col: number): number | null {
-  const addr = XLSX.utils.encode_cell({ r: row, c: col });
-  const cell = sheet[addr];
-  if (!cell || cell.v === undefined || cell.v === "") return null;
-
-  if (typeof cell.w === "string" && cell.w.includes("%")) {
-    const n = Number(cell.w.replace("%", "").replace(",", ".").trim());
-    if (Number.isFinite(n)) return n;
-  }
-
-  const raw = typeof cell.v === "number" ? cell.v : toNumber(cell.v);
-  if (raw === null) return null;
-
-  const isPercentFormat = typeof cell.z === "string" && cell.z.includes("%");
-  if (isPercentFormat) return raw * 100;
-  if (Math.abs(raw) <= 5) return raw * 100;
-  return raw;
-}
-
-/**
- * Lee un archivo .xlsx en el navegador y devuelve las filas válidas de BASE_MAESTRA.
- * La hoja SV se ignora por completo. No usa tablas dinámicas: lee la hoja como
- * matriz de celdas y arma los registros manualmente.
- */
-export async function parseFillRateWorkbook(file: File): Promise<ParseResult> {
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
-
+function parseBaseMaestra(workbook: XLSX.WorkBook, fileName: string): ParseResult {
   const sheetName = workbook.SheetNames.find((n) => n === REQUIRED_SHEET);
   if (!sheetName) {
     throw new Error(
@@ -147,7 +94,7 @@ export async function parseFillRateWorkbook(file: File): Promise<ParseResult> {
       warnings: [],
       totalRowsInSheet: matrix.length - 1,
       missingColumns,
-      fileName: file.name,
+      fileName,
     };
   }
 
@@ -171,13 +118,13 @@ export async function parseFillRateWorkbook(file: File): Promise<ParseResult> {
 
     const missingText: string[] = [];
     if (!semana) missingText.push("Semana");
-    if (!tienda) missingText.push("Tienda");
     if (!pais) missingText.push("País");
+    if (!tienda) missingText.push("Tienda");
     if (!departamento) missingText.push("Departamento");
 
     const surtido = toNumber(get("surtido"));
     const entrega = toNumber(get("entrega"));
-    let fillRate = readFillRatePercent(sheet, i, columnIndex.fillRate!);
+    let fillRate = readPercentCell(sheet, i, columnIndex.fillRate!);
 
     if (surtido === null) missingText.push("Surtido (no numérico)");
     if (entrega === null) missingText.push("Entregado (no numérico)");
@@ -225,6 +172,21 @@ export async function parseFillRateWorkbook(file: File): Promise<ParseResult> {
     warnings,
     totalRowsInSheet: matrix.length - 1,
     missingColumns: [],
-    fileName: file.name,
+    fileName,
   };
+}
+
+/**
+ * Lee un archivo .xlsx en el navegador y devuelve tanto las filas de
+ * BASE_MAESTRA (obligatoria) como las tablas de DATOS_MEZCLA (opcional).
+ * Se lee el workbook una sola vez y se reparte a ambos parsers.
+ */
+export async function parseWorkbookFile(file: File): Promise<{ base: ParseResult; mezcla: MezclaParseResult }> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
+
+  const base = parseBaseMaestra(workbook, file.name);
+  const mezcla = parseMezclaSheet(workbook);
+
+  return { base, mezcla };
 }

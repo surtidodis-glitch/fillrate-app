@@ -58,3 +58,26 @@ export const EMPTY_FILTERS: FilterState = {
   clasificacion: "Todos",
   q: "",
 };
+
+// ---- DATOS_MEZCLA (hoja opcional) ----
+
+export interface MezclaRow {
+  tipo: string;
+  porcentajeRequerido: number;
+  porcentajeEntregado: number;
+  surtido: number;
+  entregado: number;
+}
+
+export interface MezclaTable {
+  titulo: string; // ej. "Mezcla de Ropa"
+  rows: MezclaRow[];
+  total: MezclaRow | null;
+}
+
+export interface MezclaParseResult {
+  found: boolean; // true si la hoja DATOS_MEZCLA existe en el archivo
+  tables: MezclaTable[];
+}
+
+export const EMPTY_MEZCLA: MezclaParseResult = { found: false, tables: [] };

@@ -5,6 +5,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useFillRateData } from "@/context/DataContext";
 import { computeTopTiendas } from "@/lib/aggregations";
+import { formatPercent } from "@/lib/format";
 import ChartCard from "./ChartCard";
 
 export default function TopStoresChart() {
@@ -19,7 +20,7 @@ export default function TopStoresChart() {
           <XAxis
             type="number"
             domain={[0, (max: number) => Math.max(100, Math.ceil((max + 10) / 10) * 10)]}
-            tickFormatter={(v) => `${v}%`}
+            tickFormatter={(v) => formatPercent(v)}
             tick={{ fill: "#64748b", fontSize: 11 }}
             axisLine={{ stroke: "#1f2937" }}
             tickLine={false}
@@ -34,7 +35,7 @@ export default function TopStoresChart() {
           />
           <Tooltip
             contentStyle={{ background: "#0f1420", border: "1px solid #1f2937", borderRadius: 8, fontSize: 12 }}
-            formatter={(v: number) => [`${v}%`, "Fill Rate"]}
+            formatter={(v: number) => [formatPercent(v), "Fill Rate"]}
           />
           <Bar dataKey="fillRatePromedio" radius={[0, 4, 4, 0]}>
             {data.map((d, i) => (
