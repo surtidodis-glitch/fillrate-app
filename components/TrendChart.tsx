@@ -27,7 +27,7 @@ export default function TrendChart() {
             tick={{ fill: "#64748b", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
-            domain={[0, 100]}
+            domain={[0, (max: number) => Math.max(100, Math.ceil((max + 10) / 10) * 10)]}
             tickFormatter={(v) => `${v}%`}
           />
           <Tooltip
