@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useFillRateData } from "@/context/DataContext";
 import Sidebar from "@/components/Sidebar";
@@ -17,6 +17,12 @@ import DataTable from "@/components/DataTable";
 export default function Home() {
   const { hasData, fileMeta } = useFillRateData();
   const [showUploader, setShowUploader] = useState(false);
+
+  // El título de la pestaña del navegador refleja el archivo cargado,
+  // en vez de quedar fijo en "Fill Rate Analytics".
+  useEffect(() => {
+    document.title = fileMeta ? `${fileMeta.fileName} · Fill Rate Analytics` : "Fill Rate Analytics";
+  }, [fileMeta]);
 
   return (
     <div className="flex min-h-screen">
