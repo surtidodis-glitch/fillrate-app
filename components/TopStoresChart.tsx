@@ -18,7 +18,7 @@ export default function TopStoresChart() {
           <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" horizontal={false} />
           <XAxis
             type="number"
-            domain={[0, 100]}
+            domain={[0, (max: number) => Math.max(100, Math.ceil((max + 10) / 10) * 10)]}
             tickFormatter={(v) => `${v}%`}
             tick={{ fill: "#64748b", fontSize: 11 }}
             axisLine={{ stroke: "#1f2937" }}
