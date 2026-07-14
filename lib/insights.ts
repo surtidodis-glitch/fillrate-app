@@ -3,8 +3,7 @@
 // de los mismos arreglos que ya calculó lib/aggregations.ts — no hay
 // cálculos nuevos aquí, solo redacción de lo que ya se muestra en el gráfico.
 
-import type { TiendaEntregaPoint, CategoriaPoint, ClasificacionCount } from "./aggregations";
-import type { MezclaTable } from "./types";
+import type { TiendaEntregaPoint, CategoriaPoint, ClasificacionCount, MezclaSummary } from "./aggregations";
 import { formatNumber, formatPercent } from "./format";
 
 export function insightTopEntrega(data: TiendaEntregaPoint[]): string | undefined {
@@ -41,20 +40,23 @@ export function insightClasificacion(data: ClasificacionCount[]): string | undef
   return `${formatPercent(first.porcentaje)} de los registros están en "${first.clasificacion}".${extra}`;
 }
 
-export function insightMezcla(table: MezclaTable): string | undefined {
-  if (table.rows.length === 0) return undefined;
-  let maxGapRow = table.rows[0];
-  let maxGap = Math.abs(maxGapRow.porcentajeEntregado - maxGapRow.porcentajeRequerido);
-  for (const r of table.rows) {
-    const gap = Math.abs(r.porcentajeEntregado - r.porcentajeRequerido);
+export function insightMezcla(summary: MezclaSummary): string | undefined {
+  const withTarget = summary.rows.filter((r) => r.porcentajeRequerido !== undefined);
+  if (withTarget.length === 0) {
+    return `Entregado total: ${formatNumber(summary.totalEntrega)} unidades. Define metas en lib/mezclaTargets.ts para ver desvíos vs. lo requerido.`;
+  }
+  let maxGapRow = withTarget[0];
+  let maxGap = Math.abs(maxGapRow.porcentajeEntregado - (maxGapRow.porcentajeRequerido ?? 0));
+  for (const r of withTarget) {
+    const gap = Math.abs(r.porcentajeEntregado - (r.porcentajeRequerido ?? 0));
     if (gap > maxGap) {
       maxGap = gap;
       maxGapRow = r;
     }
   }
-  if (maxGap < 1) return `La mezcla entregada está alineada con lo requerido en todos los tipos.`;
-  const direction = maxGapRow.porcentajeEntregado > maxGapRow.porcentajeRequerido ? "por encima" : "por debajo";
-  return `El mayor desvío es "${maxGapRow.tipo}": se requería ${formatPercent(maxGapRow.porcentajeRequerido)} y se entregó ${formatPercent(
+  if (maxGap < 1) return `La mezcla entregada está alineada con la meta en todos los tipos.`;
+  const direction = maxGapRow.porcentajeEntregado > (maxGapRow.porcentajeRequerido ?? 0) ? "por encima" : "por debajo";
+  return `El mayor desvío es "${maxGapRow.tipo}": se requería ${formatPercent(maxGapRow.porcentajeRequerido ?? 0)} y se entregó ${formatPercent(
     maxGapRow.porcentajeEntregado
-  )} (${direction} de lo requerido).`;
+  )} (${direction} de la meta).`;
 }

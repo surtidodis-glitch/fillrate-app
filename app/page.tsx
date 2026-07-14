@@ -18,10 +18,10 @@ export default function Home() {
   const { hasData, fileMeta } = useFillRateData();
   const [showUploader, setShowUploader] = useState(false);
 
-  // El título de la pestaña del navegador refleja el archivo cargado,
-  // en vez de quedar fijo en "Fill Rate Analytics".
+  // El título de la pestaña del navegador refleja que hay un archivo cargado,
+  // sin mostrar el nombre completo del archivo con su extensión.
   useEffect(() => {
-    document.title = fileMeta ? `${fileMeta.fileName} · Fill Rate Analytics` : "Fill Rate Analytics";
+    document.title = fileMeta ? "Fill Rate Analytics · datos cargados" : "Fill Rate Analytics";
   }, [fileMeta]);
 
   return (
@@ -29,20 +29,20 @@ export default function Home() {
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-base-border bg-base-surface/40 px-6 py-3">
-          <div>
-            <h1 className="text-sm font-semibold text-slate-100">Fill Rate Analytics</h1>
-            {fileMeta && <p className="text-[11px] text-slate-500">{fileMeta.fileName}</p>}
+        <header className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-base-border bg-base-surface/40 px-6 py-4">
+          <div />
+          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-100">Fill Rate Analytics</h1>
+          <div className="flex justify-end">
+            {hasData && (
+              <button
+                onClick={() => setShowUploader((s) => !s)}
+                className="flex items-center gap-1.5 rounded-lg border border-base-border px-3 py-1.5 text-xs text-slate-300 hover:border-accent hover:text-accent-soft"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Cargar otro archivo
+              </button>
+            )}
           </div>
-          {hasData && (
-            <button
-              onClick={() => setShowUploader((s) => !s)}
-              className="flex items-center gap-1.5 rounded-lg border border-base-border px-3 py-1.5 text-xs text-slate-300 hover:border-accent hover:text-accent-soft"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Cargar otro archivo
-            </button>
-          )}
         </header>
 
         <main className="flex-1 space-y-4 p-6">

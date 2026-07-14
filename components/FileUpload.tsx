@@ -143,7 +143,7 @@ export default function FileUpload() {
             {lastMezcla && (
               <p className="mt-1 text-emerald-400/70">
                 {lastMezcla.found
-                  ? `Hoja de mezcla detectada: ${lastMezcla.tables.length} tabla(s).`
+                  ? `Hoja de mezcla detectada: ${lastMezcla.rows.length} filas.`
                   : `No se encontró una hoja de mezcla. Hojas en este archivo: ${
                       lastMezcla.availableSheets?.join(", ") || "ninguna"
                     }.`}

@@ -4,8 +4,9 @@
 // Con miles de filas esto sigue siendo instantáneo; con cientos de miles,
 // ver la nota de rendimiento en el README.
 
-import type { FillRateRow, Clasificacion } from "./types";
+import type { FillRateRow, Clasificacion, MezclaDetailRow } from "./types";
 import { CLASIFICACIONES } from "./types";
+import { getMezclaTarget } from "./mezclaTargets";
 
 export interface Kpis {
   surtido: number;
@@ -116,6 +117,54 @@ export function computeDistribucionClasificacion(rows: FillRateRow[]): Clasifica
     registros: map.get(clasificacion) ?? 0,
     porcentaje: Number((((map.get(clasificacion) ?? 0) / total) * 100).toFixed(1)),
   }));
+}
+
+export interface MezclaSummaryRow {
+  tipo: string;
+  entrega: number;
+  surtido: number;
+  porcentajeEntregado: number; // real, calculado del archivo
+  porcentajeRequerido: number | undefined; // meta de negocio (lib/mezclaTargets.ts), puede no existir
+}
+
+export interface MezclaSummary {
+  categoria: string; // "ROPA COLOR" | "CALZADO"
+  rows: MezclaSummaryRow[];
+  totalEntrega: number;
+  totalSurtido: number;
+}
+
+/**
+ * Agrupa las filas de mezcla (ya filtradas por semana/tienda si aplica) por
+ * categoría y tipo, y calcula el % entregado real de cada tipo dentro de su
+ * categoría. El % requerido viene de lib/mezclaTargets.ts, no del archivo.
+ */
+export function computeMezclaSummary(mezclaRows: MezclaDetailRow[]): MezclaSummary[] {
+  const byCategoria = new Map<string, Map<string, { entrega: number; surtido: number }>>();
+
+  for (const r of mezclaRows) {
+    if (!byCategoria.has(r.categoria)) byCategoria.set(r.categoria, new Map());
+    const inner = byCategoria.get(r.categoria)!;
+    const cur = inner.get(r.tipo) ?? { entrega: 0, surtido: 0 };
+    cur.entrega += r.entrega;
+    cur.surtido += r.surtido;
+    inner.set(r.tipo, cur);
+  }
+
+  const summaries: MezclaSummary[] = [];
+  for (const [categoria, tipos] of byCategoria.entries()) {
+    const totalEntrega = Array.from(tipos.values()).reduce((acc, v) => acc + v.entrega, 0);
+    const totalSurtido = Array.from(tipos.values()).reduce((acc, v) => acc + v.surtido, 0);
+    const rows: MezclaSummaryRow[] = Array.from(tipos.entries()).map(([tipo, v]) => ({
+      tipo,
+      entrega: v.entrega,
+      surtido: v.surtido,
+      porcentajeEntregado: totalEntrega > 0 ? Number(((v.entrega / totalEntrega) * 100).toFixed(1)) : 0,
+      porcentajeRequerido: getMezclaTarget(categoria, tipo),
+    }));
+    summaries.push({ categoria, rows, totalEntrega, totalSurtido });
+  }
+  return summaries;
 }
 
 /** Extrae los valores únicos de un campo, para poblar los <select> de filtros */

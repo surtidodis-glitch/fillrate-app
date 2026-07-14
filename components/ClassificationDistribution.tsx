@@ -23,6 +23,8 @@ export default function ClassificationDistribution() {
           <YAxis tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatPercent(v)} />
           <Tooltip
             contentStyle={{ background: "#0f1420", border: "1px solid #1f2937", borderRadius: 8, fontSize: 12 }}
+            itemStyle={{ color: "#e5e7eb" }}
+            labelStyle={{ color: "#94a3b8" }}
             formatter={(v: number, _n, item) => [`${formatPercent(v)} (${formatNumber(item.payload.registros)} registros)`, "Participación"]}
           />
           <Bar dataKey="porcentaje" radius={[6, 6, 0, 0]}>

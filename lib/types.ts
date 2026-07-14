@@ -60,25 +60,25 @@ export const EMPTY_FILTERS: FilterState = {
 };
 
 // ---- DATOS_MEZCLA (hoja opcional) ----
+// Es data fila-por-fila igual que BASE_MAESTRA, pero con una columna TIPO
+// adicional (Credencial/Retornos/Seleccionado/etc). Puede venir en uno o
+// varios bloques de columnas lado a lado dentro de la misma hoja.
 
-export interface MezclaRow {
-  tipo: string;
-  porcentajeRequerido: number;
-  porcentajeEntregado: number;
+export interface MezclaDetailRow {
+  semana: string;
+  tienda: string;
+  categoria: string; // ej. "ROPA COLOR", "CALZADO"
+  tipo: string; // ej. "CREDENCIAL", "RETORNOS", "SELECCIONADO", "MIX RAG", "RETORNO"
   surtido: number;
-  entregado: number;
-}
-
-export interface MezclaTable {
-  titulo: string; // ej. "Mezcla de Ropa"
-  rows: MezclaRow[];
-  total: MezclaRow | null;
+  entrega: number;
+  fillRate: number;
+  clasificacion: string;
 }
 
 export interface MezclaParseResult {
-  found: boolean; // true si la hoja DATOS_MEZCLA existe en el archivo
-  tables: MezclaTable[];
+  found: boolean; // true si se detectó una hoja de mezcla
+  rows: MezclaDetailRow[];
   availableSheets?: string[]; // solo si found=false, para depurar el nombre real de la hoja
 }
 
-export const EMPTY_MEZCLA: MezclaParseResult = { found: false, tables: [] };
+export const EMPTY_MEZCLA: MezclaParseResult = { found: false, rows: [] };

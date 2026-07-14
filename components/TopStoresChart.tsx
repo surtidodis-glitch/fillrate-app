@@ -38,6 +38,8 @@ export default function TopStoresChart() {
           />
           <Tooltip
             contentStyle={{ background: "#0f1420", border: "1px solid #1f2937", borderRadius: 8, fontSize: 12 }}
+            itemStyle={{ color: "#e5e7eb" }}
+            labelStyle={{ color: "#94a3b8" }}
             formatter={(v: number) => [formatNumber(v), "Entregado"]}
           />
           <Bar dataKey="entrega" radius={[0, 4, 4, 0]}>

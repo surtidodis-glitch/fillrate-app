@@ -1,15 +1,14 @@
 // lib/parseMezcla.ts
-// Lee la hoja opcional DATOS_MEZCLA, que contiene una o más tablas tipo
-// "MEZCLA DE ROPA" / "MEZCLA DE CALZADO" con columnas TIPO, % REQUERIDO,
-// % ENTREGADO, SURTIDO, ENTREGADO y una fila TOTAL al final.
-//
-// El layout no es un solo encabezado en la fila 1 como BASE_MAESTRA: son
-// varias tablas apiladas o lado a lado, cada una con su propio título y
-// encabezado. Por eso el parseo es "buscar patrones" en vez de columnas fijas.
+// Lee la hoja opcional de mezcla (ej. DATOS_MEZCLA). Es data fila-por-fila,
+// igual que BASE_MAESTRA, pero con una columna TIPO adicional. Puede venir
+// en uno o varios bloques de columnas lado a lado en la misma hoja (cada
+// bloque con su propio encabezado SEMANA/TIENDA/CATEGORÍA/TIPO/SURTIDO/
+// ENTREGA/FILL RATE/CLASIFICACIÓN) — los bloques pueden tener distinta
+// cantidad de filas entre sí.
 
 import * as XLSX from "xlsx";
-import type { MezclaParseResult, MezclaTable, MezclaRow } from "./types";
-import { normalizeHeader, toNumber, readPercentCell, readCellText } from "./excelUtils";
+import type { MezclaParseResult, MezclaDetailRow } from "./types";
+import { normalizeHeader, toNumber, readPercentCell } from "./excelUtils";
 
 const SHEET_NAME = "DATOS_MEZCLA";
 
@@ -22,121 +21,99 @@ function normalizeSheetName(name: string): string {
     .replace(/[\s_-]+/g, "");
 }
 
-/**
- * Busca la hoja de mezcla de forma flexible: coincidencia exacta con
- * "DATOS_MEZCLA" primero, y si no aparece, cualquier hoja cuyo nombre
- * contenga "mezcla" (cubre variantes como "Datos Mezcla", "Mezcla 2026", etc.).
- */
 function findMezclaSheetName(workbook: XLSX.WorkBook): string | undefined {
   const exact = workbook.SheetNames.find((n) => normalizeSheetName(n) === normalizeSheetName(SHEET_NAME));
   if (exact) return exact;
   return workbook.SheetNames.find((n) => normalizeSheetName(n).includes("mezcla"));
 }
 
-function titleCase(s: string): string {
-  return s
-    .toLowerCase()
-    .split(" ")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
+interface BlockColumns {
+  startCol: number;
+  endCol: number;
+  semana: number;
+  tienda: number;
+  categoria: number;
+  tipo: number;
+  surtido: number;
+  entrega: number;
+  fillRate?: number;
+  clasificacion?: number;
 }
 
-interface ColumnMap {
-  tipo?: number;
-  pctRequerido?: number;
-  pctEntregado?: number;
-  surtido?: number;
-  entregado?: number;
-}
+const FIELD_MAP: Record<string, keyof Omit<BlockColumns, "startCol" | "endCol">> = {
+  semana: "semana",
+  tienda: "tienda",
+  categoria: "categoria",
+  tipo: "tipo",
+  surtido: "surtido",
+  entrega: "entrega",
+  entregado: "entrega",
+  "fill rate": "fillRate",
+  fillrate: "fillRate",
+  clasificacion: "clasificacion",
+};
 
-function findHeaderColumns(row: unknown[]): ColumnMap | null {
-  const map: ColumnMap = {};
-  row.forEach((cell, idx) => {
-    const norm = normalizeHeader(String(cell ?? ""));
-    if (!norm) return;
-    if (norm === "tipo") map.tipo = idx;
-    else if (norm.includes("%") && norm.includes("requerido")) map.pctRequerido = idx;
-    else if (norm.includes("%") && norm.includes("entregado")) map.pctEntregado = idx;
-    else if (norm === "surtido") map.surtido = idx;
-    else if (norm === "entregado") map.entregado = idx;
+/** Encuentra todos los bloques de columnas (cada uno con su propio SEMANA/TIENDA/...) en una fila de encabezado. */
+function findBlocks(headerRow: unknown[]): BlockColumns[] {
+  const semanaColumns: number[] = [];
+  headerRow.forEach((cell, idx) => {
+    if (normalizeHeader(String(cell ?? "")) === "semana") semanaColumns.push(idx);
   });
-  // Se considera válida una tabla de mezcla si al menos tiene TIPO + algo más
-  if (map.tipo === undefined) return null;
-  return map;
-}
 
-function parseRow(sheet: XLSX.WorkSheet, matrixRow: unknown[], rowIdx: number, cols: ColumnMap): MezclaRow | null {
-  const tipo = String(matrixRow[cols.tipo!] ?? "").trim();
-  if (!tipo) return null;
-
-  const porcentajeRequerido = cols.pctRequerido !== undefined ? readPercentCell(sheet, rowIdx, cols.pctRequerido) ?? 0 : 0;
-  const porcentajeEntregado = cols.pctEntregado !== undefined ? readPercentCell(sheet, rowIdx, cols.pctEntregado) ?? 0 : 0;
-  const surtido = cols.surtido !== undefined ? toNumber(matrixRow[cols.surtido]) ?? 0 : 0;
-  const entregado = cols.entregado !== undefined ? toNumber(matrixRow[cols.entregado]) ?? 0 : 0;
-
-  return { tipo, porcentajeRequerido, porcentajeEntregado, surtido, entregado };
+  return semanaColumns.map((startCol, i) => {
+    const endCol = i + 1 < semanaColumns.length ? semanaColumns[i + 1] - 1 : headerRow.length - 1;
+    const block: Partial<BlockColumns> = { startCol, endCol };
+    for (let c = startCol; c <= endCol; c++) {
+      const norm = normalizeHeader(String(headerRow[c] ?? ""));
+      const field = FIELD_MAP[norm];
+      if (field) block[field] = c;
+    }
+    return block as BlockColumns;
+  });
 }
 
 export function parseMezclaSheet(workbook: XLSX.WorkBook): MezclaParseResult {
   const sheetName = findMezclaSheetName(workbook);
-  if (!sheetName) return { found: false, tables: [], availableSheets: workbook.SheetNames };
+  if (!sheetName) return { found: false, rows: [], availableSheets: workbook.SheetNames };
 
   const sheet = workbook.Sheets[sheetName];
   const matrix: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: true, defval: "" });
 
-  const tables: MezclaTable[] = [];
-  let i = 0;
-
-  while (i < matrix.length) {
-    const row = matrix[i];
-    const firstCellText = String(row.find((c) => String(c ?? "").trim() !== "") ?? "").trim();
-    const match = /mezcla\s+de\s+(.+)/i.exec(firstCellText);
-
-    if (match) {
-      const titulo = `Mezcla de ${titleCase(match[1].trim())}`;
-
-      // Busca la fila de encabezado (con "TIPO") en las próximas filas
-      let headerRowIdx = -1;
-      let cols: ColumnMap | null = null;
-      for (let j = i + 1; j < Math.min(i + 5, matrix.length); j++) {
-        const found = findHeaderColumns(matrix[j]);
-        if (found) {
-          headerRowIdx = j;
-          cols = found;
-          break;
-        }
-      }
-
-      if (cols && headerRowIdx !== -1) {
-        const rows: MezclaRow[] = [];
-        let total: MezclaRow | null = null;
-        let k = headerRowIdx + 1;
-
-        for (; k < matrix.length; k++) {
-          const dataRow = matrix[k];
-          const tipoCell = normalizeHeader(readCellText(sheet, k, cols.tipo!));
-          const isEmpty = dataRow.every((c) => String(c ?? "").trim() === "");
-          if (isEmpty) break; // fila en blanco = fin de la tabla
-
-          const parsed = parseRow(sheet, dataRow, k, cols);
-          if (!parsed) continue;
-
-          if (tipoCell.startsWith("total")) {
-            total = parsed;
-            k++; // consume la fila TOTAL y termina la tabla
-            break;
-          }
-          rows.push(parsed);
-        }
-
-        tables.push({ titulo, rows, total });
-        i = k;
-        continue;
-      }
+  // Busca la primera fila que tenga al menos una columna "SEMANA" — esa es la fila de encabezado(s)
+  let headerRowIdx = -1;
+  for (let i = 0; i < Math.min(matrix.length, 10); i++) {
+    if (matrix[i].some((c) => normalizeHeader(String(c ?? "")) === "semana")) {
+      headerRowIdx = i;
+      break;
     }
+  }
+  if (headerRowIdx === -1) return { found: false, rows: [], availableSheets: workbook.SheetNames };
 
-    i++;
+  const blocks = findBlocks(matrix[headerRowIdx]).filter(
+    (b) => b.tienda !== undefined && b.categoria !== undefined && b.tipo !== undefined && b.surtido !== undefined && b.entrega !== undefined
+  );
+  if (blocks.length === 0) return { found: false, rows: [], availableSheets: workbook.SheetNames };
+
+  const rows: MezclaDetailRow[] = [];
+
+  for (const block of blocks) {
+    for (let r = headerRowIdx + 1; r < matrix.length; r++) {
+      const raw = matrix[r];
+      const semana = String(raw[block.semana] ?? "").trim();
+      const tienda = String(raw[block.tienda] ?? "").trim();
+      const categoria = String(raw[block.categoria] ?? "").trim();
+      const tipo = String(raw[block.tipo] ?? "").trim();
+
+      if (!semana && !tienda && !categoria && !tipo) continue; // fila vacía para este bloque específico
+
+      const surtido = toNumber(raw[block.surtido]) ?? 0;
+      const entrega = toNumber(raw[block.entrega]) ?? 0;
+      const fillRate = block.fillRate !== undefined ? readPercentCell(sheet, r, block.fillRate) ?? 0 : entrega && surtido ? Number(((entrega / surtido) * 100).toFixed(2)) : 0;
+      const clasificacion = block.clasificacion !== undefined ? String(raw[block.clasificacion] ?? "").trim() : "";
+
+      rows.push({ semana, tienda, categoria, tipo, surtido, entrega, fillRate, clasificacion });
+    }
   }
 
-  return { found: tables.length > 0, tables };
+  return { found: rows.length > 0, rows };
 }
